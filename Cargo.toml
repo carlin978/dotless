@@ -1,0 +1,9 @@
+[package]
+name = "dotless"
+version = "0.1.0"
+edition = "2024"
+license = "BSD-3-Clause"
+description = "A simple yet powerful dotfiles management utility"
+repository = "https://github.com/carlin978/dotless"
+
+[dependencies]
