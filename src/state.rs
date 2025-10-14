@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+pub trait SerializeState {
+	fn serialize_state(&self) -> Option<String>;
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct File {}
 
@@ -19,6 +23,12 @@ pub enum Dotfile {
 }
 
 pub type State = HashMap<String, Dotfile>;
+
+impl SerializeState for State {
+	fn serialize_state(&self) -> Option<String> {
+		ron::to_string(self).ok()
+	}
+}
 
 pub fn read_state() -> anyhow::Result<State> {
 	todo!()

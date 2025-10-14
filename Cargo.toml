@@ -9,6 +9,8 @@ repository = "https://github.com/carlin978/dotless"
 [dependencies]
 anyhow = "1.0.100"
 clap = { version = "4.5.48", features = ["derive"] }
+git2 = { version = "0.20.2", features = ["https", "ssh"] }
+inquire = "0.9.1"
 ron = "0.11.0"
 serde = { version = "1.0.228", features = ["derive"] }
 toml = "0.9.7"
