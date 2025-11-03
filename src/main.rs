@@ -11,7 +11,7 @@ const DOTFILES_DIR: &'static str = match option_env!("DOTLESS_DIR") {
 };
 
 fn main() -> anyhow::Result<()> {
-	use crate::path::{expand_path_if_in_home_dir, get_repo_path};
+	use crate::path::{expand_path_if_in_home_dir, get_repo_path, get_state_path};
 	use crate::state::SerializeState;
 	use anyhow::bail;
 	use clap::Parser;
@@ -32,7 +32,7 @@ fn main() -> anyhow::Result<()> {
 				fs::write(get_config_path(), include_str!("../assets/config.toml"))?;
 				fs::write(repo_path.join(".gitignore"), include_str!("../assets/gitignore"))?;
 				fs::write(
-					repo_path.join(".dotless.state"),
+					get_state_path(),
 					state::State::default()
 						.serialize_state()
 						.expect("Default empty state should serialize"),

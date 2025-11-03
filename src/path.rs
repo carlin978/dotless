@@ -20,6 +20,16 @@ pub fn get_config_path() -> PathBuf {
 	get_repo_path().join("dotless.toml")
 }
 
+///Gets the path to the state file in the repository
+pub fn get_state_path() -> PathBuf {
+	get_repo_path().join(".dotless.state")
+}
+
+///Gets the path to the local state file in the repository
+pub fn get_local_state_path() -> PathBuf {
+	get_repo_path().join(".local.dotless.state")
+}
+
 ///Expands path and checks if it is in the home directory, returns the canonical path and the
 ///stripped path if true, returns None otherwise
 pub fn expand_path_if_in_home_dir(path: PathBuf) -> Option<(PathBuf, PathBuf)> {
