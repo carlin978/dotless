@@ -87,7 +87,14 @@ fn main() -> anyhow::Result<()> {
 
 				let sig = repo.signature()?;
 
-				repo.commit(Some("HEAD"), &sig, &sig, "Init dotless", &tree, &[])?;
+				repo.commit(
+					Some("HEAD"),
+					&sig,
+					&sig,
+					include_str!("../assets/initial_commit_message.txt"),
+					&tree,
+					&[],
+				)?;
 			} else {
 				if repo_path.exists() {
 					bail!("Repository location already exists, did you intend to use --update?")
@@ -111,7 +118,14 @@ fn main() -> anyhow::Result<()> {
 
 				let sig = repo.signature()?;
 
-				repo.commit(Some("HEAD"), &sig, &sig, "Init dotless", &tree, &[])?;
+				repo.commit(
+					Some("HEAD"),
+					&sig,
+					&sig,
+					include_str!("../assets/initial_commit_message.txt"),
+					&tree,
+					&[],
+				)?;
 			}
 		}
 		cli::Commands::Track { template, directory, path } => {
