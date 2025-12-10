@@ -146,6 +146,12 @@ fn main() -> anyhow::Result<()> {
 		cli::Commands::Unlink { all } => todo!(),
 		cli::Commands::Health {} => todo!(),
 		cli::Commands::Commit => todo!(),
+		cli::Commands::Git { args } => {
+			use std::process::Command;
+			let repo_path = get_repo_path();
+
+			let _ = Command::new("git").args(args).current_dir(repo_path).status();
+		}
 	};
 
 	Ok(())

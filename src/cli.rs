@@ -9,11 +9,11 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-	///Initialize repository with state and configuration
+	///Initialize repository with an empty state and default configuration
 	Init {
 		///Update existing repository
 		///Adds a new branch to the existing repository and continues initialization from there,
-		///skipping Git initializion steps
+		///skipping Git initialization steps
 		#[arg(short, long)]
 		update: bool,
 	},
@@ -36,7 +36,7 @@ pub enum Commands {
 		#[arg(short, long)]
 		all: bool,
 	},
-	///Removes a symlink for a file and updates state
+	///Removes a symlink for a file
 	Unlink {
 		///Skip selection and unlink all files
 		#[arg(short, long)]
@@ -44,6 +44,11 @@ pub enum Commands {
 	},
 	///Create commit with interactive file selection and an automatic commit message
 	Commit,
+	///Runs an arbitrary git command on the repository
+	Git {
+		#[arg(name = "COMMAND", trailing_var_arg = true, allow_hyphen_values = true)]
+		args: Vec<String>,
+	},
 	///Performs a full health check of the repository, state and links
 	Health {},
 }
