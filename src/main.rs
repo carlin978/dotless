@@ -4,15 +4,18 @@ mod config;
 mod path;
 mod state;
 
-// Option::unwrap_or() is not stabilized as const at the time of writing
 const DOTFILES_DIR: &'static str = match option_env!("DOTLESS_DIR") {
 	Some(v) => v,
 	None => ".dotfiles", //default dotfiles directory
 };
+const DOTFILES_HOME: &'static str = match option_env!("DOTLESS_HOME") {
+	Some(v) => v,
+	None => "home", //default name for home in dotfiles directory
+};
 
 fn main() -> anyhow::Result<()> {
-	use crate::path::{expand_path_if_in_home_dir, get_repo_path, get_state_path};
-	use crate::state::SerializeState;
+	use crate::path::{expand_path_if_in_home_dir, get_repo_path};
+	use anyhow::anyhow;
 	use anyhow::bail;
 	use clap::Parser;
 	use git2::Repository;
@@ -31,12 +34,11 @@ fn main() -> anyhow::Result<()> {
 
 				fs::write(get_config_path(), include_str!("../assets/config.toml"))?;
 				fs::write(repo_path.join(".gitignore"), include_str!("../assets/gitignore"))?;
-				fs::write(
-					get_state_path(),
-					state::State::default()
-						.serialize_state()
-						.expect("Default empty state should serialize"),
-				)?;
+				state::State::default().write_state()?;
+
+				let home = repo_path.join(DOTFILES_HOME);
+				fs::create_dir(&home)?;
+				fs::write(home.join(".gitkeep"), "")?;
 
 				Ok(())
 			};
@@ -128,14 +130,61 @@ fn main() -> anyhow::Result<()> {
 				)?;
 			}
 		}
-		cli::Commands::Track { template, directory, path } => {
+		cli::Commands::Track { non_dotfile, template, directory, path, no_link } => {
 			if let Some((canonical_path, home_path)) = expand_path_if_in_home_dir(path) {
+				let repo_path = get_repo_path();
+
+				if home_path.starts_with(DOTFILES_DIR) {
+					bail!("Cannot track files in the dotfiles repo")
+				}
+
+				let home_path_str =
+					home_path.to_str().expect("Non-Unicode paths are not supported");
+
+				let mut state = state::read_state()?;
+
 				if directory {
 					todo!()
 				} else if template {
 					todo!()
 				} else {
-					todo!()
+					use std::fs;
+					use std::os::unix::fs::symlink;
+
+					let local_path = if non_dotfile {
+						home_path_str
+					} else {
+						home_path_str.strip_prefix('.').ok_or(anyhow!(
+							"Path provided is not a dotfile, did you mean to use --non-dotfile?"
+						))?
+					};
+
+					let file = repo_path.join(DOTFILES_HOME).join(local_path);
+
+					let dotfile = state::Dotfile::new_file(
+						home_path_str.to_owned(),
+						local_path.to_owned(),
+						non_dotfile,
+					);
+
+					state.add_dotfile(dotfile);
+
+					{
+						fs::create_dir_all(
+							file.parent().expect("In-repo file path somehow was root"),
+						)?;
+
+						fs::copy(&canonical_path, &file)?;
+						fs::remove_file(&canonical_path)?;
+
+						if !no_link {
+							symlink(&file, &canonical_path)?;
+						}
+
+						state.write_state()?;
+					}
+
+					println!("Successfully tracking {home_path_str}");
 				}
 			} else {
 				bail!("Path is not valid")
@@ -147,10 +196,11 @@ fn main() -> anyhow::Result<()> {
 		cli::Commands::Health {} => todo!(),
 		cli::Commands::Commit => todo!(),
 		cli::Commands::Git { args } => {
+			use std::os::unix::process::CommandExt;
 			use std::process::Command;
 			let repo_path = get_repo_path();
 
-			let _ = Command::new("git").args(args).current_dir(repo_path).status();
+			bail!(Command::new("git").args(args).current_dir(repo_path).exec());
 		}
 	};
 

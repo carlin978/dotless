@@ -19,12 +19,18 @@ pub enum Commands {
 	},
 	///Move dotfile to the repository and track changes and state
 	Track {
-		///Track dotfile as a template, cannot be used on directories
+		///Track dotfile as a template, must be plain text and cannot be used on directories
 		#[arg(short, long, conflicts_with = "directory")]
 		template: bool,
 		///Track a directory instead of a file
 		#[arg(short, long)]
 		directory: bool,
+		///Track non-dotfiles
+		#[arg(long)]
+		non_dotfile: bool,
+		///Do not symlink tracked dotfiles
+		#[arg(long)]
+		no_link: bool,
 		///Path to the dotfile
 		path: PathBuf,
 	},

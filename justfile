@@ -3,7 +3,7 @@ default:
 
 [no-cd]
 run *FLAGS:
-	cargo run -- {{ FLAGS }}
+	cargo run --quiet -- {{ FLAGS }}
 
 test:
 	cargo test

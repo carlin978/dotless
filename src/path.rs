@@ -1,5 +1,5 @@
 #[cfg(debug_assertions)]
-///On debug mode treat the current directory as the home directory
+///On debug builds treat the current directory as the home directory
 fn home_dir() -> Option<PathBuf> {
 	std::env::current_dir().ok()
 }
@@ -37,7 +37,7 @@ pub fn expand_path_if_in_home_dir(path: PathBuf) -> Option<(PathBuf, PathBuf)> {
 
 	let canonical_path = path.canonicalize().ok()?;
 
-	canonical_path.starts_with(home_dir.clone()).then_some((
+	canonical_path.starts_with(&home_dir).then_some((
 		canonical_path.clone(),
 		canonical_path.strip_prefix(home_dir).ok()?.to_path_buf(),
 	))
