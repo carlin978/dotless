@@ -3,6 +3,7 @@ mod cli;
 mod config;
 mod path;
 mod state;
+mod utils;
 
 const DOTFILES_DIR: &'static str = match option_env!("DOTLESS_DIR") {
 	Some(v) => v,
@@ -19,7 +20,7 @@ fn main() -> anyhow::Result<()> {
 	use anyhow::bail;
 	use clap::Parser;
 	use git2::Repository;
-	use inquire::{Confirm, Text};
+	use inquire::{Confirm, MultiSelect, Select, Text};
 
 	let cli = cli::Cli::parse();
 
@@ -97,6 +98,8 @@ fn main() -> anyhow::Result<()> {
 					&tree,
 					&[],
 				)?;
+
+				println!("Repository successfully updated at {}", repo_path.to_string_lossy());
 			} else {
 				if repo_path.exists() {
 					bail!("Repository location already exists, did you intend to use --update?")
@@ -128,11 +131,14 @@ fn main() -> anyhow::Result<()> {
 					&tree,
 					&[],
 				)?;
+
+				println!("Repository successfully initialized at {}", repo_path.to_string_lossy());
 			}
 		}
 		cli::Commands::Track { non_dotfile, template, directory, path, no_link } => {
 			if let Some((canonical_path, home_path)) = expand_path_if_in_home_dir(path) {
 				let repo_path = get_repo_path();
+				let repo_home_path = repo_path.join(DOTFILES_HOME);
 
 				if home_path.starts_with(DOTFILES_DIR) {
 					bail!("Cannot track files in the dotfiles repo")
@@ -141,10 +147,130 @@ fn main() -> anyhow::Result<()> {
 				let home_path_str =
 					home_path.to_str().expect("Non-Unicode paths are not supported");
 
-				let mut state = state::read_state()?;
+				let mut state = crate::state::read_state()?;
 
 				if directory {
-					todo!()
+					use crate::utils::ls_dir;
+					use std::fs;
+					use std::os::unix::fs::symlink;
+
+					if canonical_path.is_dir() {
+						let local_path = if non_dotfile {
+							home_path_str
+						} else {
+							home_path_str.strip_prefix('.').ok_or(anyhow!(
+								"Path provided is not a dotfile, did you mean to use --non-dotfile?"
+							))?
+						};
+
+						let dir = repo_home_path.join(local_path);
+						dbg!(&dir);
+
+						let files = ls_dir(&canonical_path)?;
+
+						let mode = Select::new(
+							"Select directory tracking mode",
+							vec!["All", "Whitelist", "Blacklist"],
+						)
+						.prompt()?;
+
+						let dotfile = match mode {
+							"All" => crate::state::Dotfile::new_directory_all(
+								home_path_str.to_owned(),
+								local_path.to_owned(),
+								non_dotfile,
+							),
+							"Whitelist" => {
+								let list = MultiSelect::new(
+									"Select files to be whitelisted",
+									files
+										.iter()
+										.map(|p| {
+											p.strip_prefix(&canonical_path)
+												.expect(
+													"File in directory should indeed be in said directory",
+												)
+												.to_str()
+												.expect("Non-Unicode paths are not supported")
+										})
+										.collect(),
+								)
+								.prompt()?;
+
+								crate::state::Dotfile::new_directory_whitelist(
+									home_path_str.to_owned(),
+									local_path.to_owned(),
+									non_dotfile,
+									list.iter().map(|v| v.to_string()).collect(),
+								)
+							}
+							"Blacklist" => {
+								let list = MultiSelect::new(
+									"Select files to be blacklisted",
+									files
+										.iter()
+										.map(|p| {
+											p.strip_prefix(&canonical_path)
+												.expect(
+													"File in directory should indeed be in said directory",
+												)
+												.to_str()
+												.expect("Non-Unicode paths are not supported")
+										})
+										.collect(),
+								)
+								.prompt()?;
+
+								crate::state::Dotfile::new_directory_blacklist(
+									home_path_str.to_owned(),
+									local_path.to_owned(),
+									non_dotfile,
+									list.iter().map(|v| v.to_string()).collect(),
+								)
+							}
+							_ => bail!("How the hell? Not a valid directory tracking mode."),
+						};
+						dbg!(&dotfile);
+
+						for file in files {
+							if let Some((canonical_file, home_file)) =
+								expand_path_if_in_home_dir(file)
+							{
+								let home_file_str = home_file
+									.to_str()
+									.expect("Non-Unicode paths are not supported");
+
+								let repo_file = repo_home_path
+									.join(home_file_str.strip_prefix('.').unwrap_or(home_file_str));
+
+								fs::create_dir_all(
+									repo_file.parent().expect("In-repo file path somehow was root"),
+								)?;
+
+								fs::copy(canonical_file, repo_file)?;
+							} else {
+								bail!("Path of one the files in the directory was somehow invalid")
+							}
+						}
+
+						fs::remove_dir_all(&canonical_path)?;
+
+						if !no_link {
+							symlink(repo_home_path.join(local_path), &canonical_path)?;
+						}
+
+						if let Some(gitignore) = dotfile.directory_gen_gitignore() {
+							fs::write(dir.join(".gitignore"), gitignore)?;
+						}
+
+						state.add_dotfile(dotfile);
+
+						state.write_state()?;
+
+						println!("Successfully tracking directory {home_path_str}");
+					} else {
+						bail!("Not a directory!")
+					}
 				} else if template {
 					todo!()
 				} else {
@@ -159,9 +285,10 @@ fn main() -> anyhow::Result<()> {
 						))?
 					};
 
-					let file = repo_path.join(DOTFILES_HOME).join(local_path);
+					let file = repo_home_path.join(local_path);
+					dbg!(&file);
 
-					let dotfile = state::Dotfile::new_file(
+					let dotfile = crate::state::Dotfile::new_file(
 						home_path_str.to_owned(),
 						local_path.to_owned(),
 						non_dotfile,
